@@ -1,7 +1,13 @@
 import { create } from "@zitadel/client";
 import { RequestChallengesSchema } from "@zitadel/proto/zitadel/session/v2/challenge_pb";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
-import { getOTPSMSResendCooldownSeconds, getOTPSMSRetryAfterSeconds, sanitizeChallenges } from "./challenges";
+import {
+  getOTPEmailResendCooldownSeconds,
+  getOTPEmailRetryAfterSeconds,
+  getOTPSMSResendCooldownSeconds,
+  getOTPSMSRetryAfterSeconds,
+  sanitizeChallenges,
+} from "./challenges";
 
 describe("sanitizeChallenges", () => {
   it("returns undefined when no challenges are requested", () => {
@@ -139,5 +145,43 @@ describe("getOTPSMSRetryAfterSeconds", () => {
   it("follows the configured cooldown", () => {
     vi.stubEnv("OTP_SMS_RESEND_COOLDOWN_SECONDS", "0");
     expect(getOTPSMSRetryAfterSeconds(`${now}`, now)).toBe(0);
+  });
+});
+
+describe("OTP e-mail resend cooldown", () => {
+  const now = 1_000_000;
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("defaults to 30 seconds and is configured on its own", () => {
+    vi.stubEnv("OTP_EMAIL_RESEND_COOLDOWN_SECONDS", undefined);
+    vi.stubEnv("OTP_SMS_RESEND_COOLDOWN_SECONDS", "60");
+    expect(getOTPEmailResendCooldownSeconds()).toBe(30);
+
+    vi.stubEnv("OTP_EMAIL_RESEND_COOLDOWN_SECONDS", "45");
+    expect(getOTPEmailResendCooldownSeconds()).toBe(45);
+    expect(getOTPSMSResendCooldownSeconds()).toBe(60);
+  });
+
+  it("falls back to the default for values that are not a non-negative integer", () => {
+    vi.stubEnv("OTP_EMAIL_RESEND_COOLDOWN_SECONDS", "-5");
+    expect(getOTPEmailResendCooldownSeconds()).toBe(30);
+  });
+
+  it("allows sending when no e-mail was sent yet or the timestamp is garbage", () => {
+    expect(getOTPEmailRetryAfterSeconds(undefined, now)).toBe(0);
+    expect(getOTPEmailRetryAfterSeconds("garbage", now)).toBe(0);
+  });
+
+  it("returns the remaining seconds, rounded up, and allows sending after the cooldown", () => {
+    expect(getOTPEmailRetryAfterSeconds(`${now - 10_500}`, now)).toBe(20);
+    expect(getOTPEmailRetryAfterSeconds(`${now - 30_000}`, now)).toBe(0);
+  });
+
+  it("can be disabled with 0", () => {
+    vi.stubEnv("OTP_EMAIL_RESEND_COOLDOWN_SECONDS", "0");
+    expect(getOTPEmailRetryAfterSeconds(`${now}`, now)).toBe(0);
   });
 });

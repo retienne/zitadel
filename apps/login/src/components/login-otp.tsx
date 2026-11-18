@@ -3,7 +3,6 @@
 import { completeFlowOrGetUrl } from "@/lib/actions/flow";
 import { updateOrCreateSession } from "@/lib/actions/session";
 import { handleServerActionResponse } from "@/lib/client-utils";
-import { RESEND_COOLDOWN_SECONDS } from "@/lib/constants";
 import { create } from "@zitadel/client";
 import { RequestChallengesSchema } from "@zitadel/proto/zitadel/session/v2/challenge_pb";
 import { ChecksSchema } from "@zitadel/proto/zitadel/session/v2/session_service_pb";
@@ -95,12 +94,6 @@ export function LoginOTP({ loginName, sessionId, requestId, organization, method
 
     if (response && "error" in response) {
       return response.error;
-    }
-
-    if (method === "email") {
-      // the server only enforces a cooldown for SMS, so the email countdown runs in the browser (a UX guard against repeated clicks)
-      resendAvailableAt.current = Date.now() + RESEND_COOLDOWN_SECONDS * 1000;
-      setResendCooldown(RESEND_COOLDOWN_SECONDS);
     }
   }, [method, requestId, loginName, sessionId, organization, t]);
 

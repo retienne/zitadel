@@ -2,7 +2,13 @@
 
 import { completeFlowOrGetUrl } from "@/lib/actions/flow";
 import { equalsIgnoreCase } from "@/lib/server/auth-utils";
-import { getOTPSMSResendCooldownSeconds, getOTPSMSRetryAfterSeconds, SessionUpdatedError } from "@/lib/server/challenges";
+import {
+  getOTPEmailResendCooldownSeconds,
+  getOTPEmailRetryAfterSeconds,
+  getOTPSMSResendCooldownSeconds,
+  getOTPSMSRetryAfterSeconds,
+  SessionUpdatedError,
+} from "@/lib/server/challenges";
 import {
   getMostRecentSessionCookie,
   getSessionCookieById,
@@ -342,12 +348,13 @@ export async function updateOrCreateSession(options: UpdateSessionCommand) {
     }
   }
 
-  if (challenges?.otpSms) {
-    const retryAfterSeconds = getOTPSMSRetryAfterSeconds(recentSession.otpSmsSentTs);
-    if (retryAfterSeconds > 0) {
-      // no error message: the UI shows the countdown on the resend button instead
-      return { retryAfterSeconds };
-    }
+  const retryAfterSeconds = Math.max(
+    challenges?.otpSms ? getOTPSMSRetryAfterSeconds(recentSession.otpSmsSentTs) : 0,
+    challenges?.otpEmail ? getOTPEmailRetryAfterSeconds(recentSession.otpEmailSentTs) : 0,
+  );
+  if (retryAfterSeconds > 0) {
+    // no error message: the UI shows the countdown on the resend button instead
+    return { retryAfterSeconds };
   }
 
   // The lifetime always comes from the login policy of the session's user (the cookie entry is
@@ -432,8 +439,12 @@ export async function updateOrCreateSession(options: UpdateSessionCommand) {
     // keeping the projection explicit means no OTP code can leak through this boundary even
     // if that ever regresses (GHSA-3gwm-5wx8-4gm6).
     challenges: challengeResponse?.webAuthN ? { webAuthN: challengeResponse.webAuthN } : undefined,
-    // lets the UI count down until the next OTP SMS may be requested
-    retryAfterSeconds: challenges?.otpSms ? getOTPSMSResendCooldownSeconds() : undefined,
+    // lets the UI count down until the next OTP SMS or e-mail may be requested
+    retryAfterSeconds: challenges?.otpSms
+      ? getOTPSMSResendCooldownSeconds()
+      : challenges?.otpEmail
+        ? getOTPEmailResendCooldownSeconds()
+        : undefined,
   };
 }
 
