@@ -26,4 +26,14 @@ describe("useResendCooldown", () => {
     expect(result.current.remaining).toBe(0);
     expect(result.current.isCoolingDown).toBe(false);
   });
+
+  test("counts down from the duration passed to start", () => {
+    const { result } = renderHook(() => useResendCooldown(30));
+
+    act(() => result.current.start(5));
+    expect(result.current.remaining).toBe(5);
+
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(result.current.isCoolingDown).toBe(false);
+  });
 });

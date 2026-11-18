@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { RESEND_COOLDOWN_SECONDS } from "./constants";
 
 /**
- * Client-side cooldown for "Resend code" buttons. This is a UX guard against
- * accidental repeated clicks (each resend invalidates the previous code), not
- * a security control.
+ * Countdown for "Resend code" buttons. Started with the default duration it is
+ * a UX guard against accidental repeated clicks (each resend invalidates the
+ * previous code), not a security control; the OTP page starts it with the
+ * cooldown the server enforces.
  *
- * `start()` begins the countdown; `remaining` is the number of seconds left
- * (0 when the button may be used again).
+ * `start()` begins the countdown, for `seconds` or the duration passed to it
+ * (e.g. the server's `retryAfterSeconds`); `remaining` is the number of seconds
+ * left (0 when the button may be used again).
  */
 export function useResendCooldown(seconds: number = RESEND_COOLDOWN_SECONDS) {
   const [endsAt, setEndsAt] = useState<number | null>(null);
@@ -29,10 +31,13 @@ export function useResendCooldown(seconds: number = RESEND_COOLDOWN_SECONDS) {
     return () => clearInterval(interval);
   }, [endsAt]);
 
-  const start = useCallback(() => {
-    setEndsAt(Date.now() + seconds * 1000);
-    setRemaining(seconds);
-  }, [seconds]);
+  const start = useCallback(
+    (duration: number = seconds) => {
+      setEndsAt(Date.now() + duration * 1000);
+      setRemaining(duration);
+    },
+    [seconds],
+  );
 
   const isCoolingDown = remaining > 0;
 
