@@ -67,7 +67,7 @@ describe("LoginOTP", () => {
     });
   });
 
-  describe("SMS resend cooldown", () => {
+  describe("resend cooldown", () => {
     afterEach(() => {
       vi.useRealTimers();
     });
@@ -132,12 +132,23 @@ describe("LoginOTP", () => {
       expect(screen.queryByTestId("error")).not.toBeInTheDocument();
     });
 
-    test("does not start a countdown for email codes", async () => {
+    test("counts down after an email code was sent, although the server reports no cooldown", async () => {
       mockUpdateOrCreateSession.mockResolvedValue({ sessionId: "session-1" });
 
       render(<LoginOTP method="email" />);
 
       await waitFor(() => expect(mockUpdateOrCreateSession).toHaveBeenCalledTimes(1));
+      const resendButton = screen.getByTestId("resend-button");
+      await waitFor(() => expect(resendButton).toHaveTextContent('verify.resendCodeIn {"seconds":30}'));
+      expect(resendButton).toBeDisabled();
+    });
+
+    test("does not start the email countdown when sending the code failed", async () => {
+      mockUpdateOrCreateSession.mockResolvedValue({ error: "could not send" });
+
+      render(<LoginOTP method="email" />);
+
+      await waitFor(() => expect(screen.getByTestId("error")).toBeInTheDocument());
       const resendButton = screen.getByTestId("resend-button");
       await waitFor(() => expect(resendButton).not.toBeDisabled());
       expect(resendButton).toHaveTextContent(/^verify\.resendCode$/);
