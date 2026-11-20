@@ -2,6 +2,13 @@ FROM node:24-alpine
 WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
+# The server runs on node alone (entrypoint.sh execs it, the health check is a node script). The
+# package managers the base image ships - npm, corepack and yarn - never run here, and npm's own
+# dependencies (undici, brace-expansion) are what image scanners report against this image, so they
+# are removed rather than carried.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-v* \
+        /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+        /usr/local/bin/yarn /usr/local/bin/yarnpkg
 # If /.env-file/.env is mounted into the container, its variables are made available to the server before it starts up.
 RUN mkdir -p /.env-file && touch /.env-file/.env && chown -R nextjs:nodejs /.env-file
 
